@@ -1,0 +1,152 @@
+<html>
+	<head>
+		<title>My first Three.js app</title>
+		<style>
+			body { margin: 0; }
+			canvas { width: 100%; height: 100% }
+
+			#camInput {
+				width: 800px;
+				height: 600px;
+			}
+
+			#flowOutContainer {
+				width: 800px;
+				height: 600px;
+			}
+		</style>
+	</head>
+	<body>
+
+		<div id="camInput"> </div>
+		<div id="flowOutContainer"><canvas id="flowOut"></canvas></div>
+		<script src="js/three.min.js"></script>
+		<script src="js/Projector.js"></script>
+		<script src="js/CanvasRenderer.js"></script>
+		<script src="js/flowzone.js"></script>
+		<script src="js/flowCalculator.js"></script>
+		<script src="js/colors.js"></script>
+
+		<script>
+			var rendererParrentDomElement = document.getElementById("camInput");
+
+			var scene = new THREE.Scene();
+			var camera = new THREE.PerspectiveCamera( 75, rendererParrentDomElement.clientWidth/rendererParrentDomElement.clientHeight, 0.1, 1000 );
+
+			//var renderer = new THREE.WebGLRenderer( {     preserveDrawingBuffer: true  });
+			var renderer = new THREE.CanvasRenderer();
+
+			renderer.setSize( rendererParrentDomElement.clientWidth, rendererParrentDomElement.clientHeight );
+			rendererParrentDomElement.appendChild( renderer.domElement );
+
+			var light = new THREE.PointLight( 0xffffff, 1, 100 ); 
+			light.position.set( 5, 5, -5 ); 
+			scene.add( light );
+
+			var alight = new THREE.AmbientLight( 0x202020 ); // soft white light 
+			scene.add( alight );
+
+			var planeG = new THREE.PlaneGeometry( 50, 50); 
+			var material = new THREE.MeshLambertMaterial( {color: 0xffff00, side: THREE.DoubleSide} ); 
+			var plane = new THREE.Mesh( planeG, material ); 
+			plane.rotation.x = Math.PI /2
+			scene.add( plane );
+
+			var cylinderRadius = 0.3;
+			var cylinderG = new THREE.CylinderGeometry(cylinderRadius, cylinderRadius, 4);
+			var material = new THREE.MeshLambertMaterial( { color: 0x00ff00 } );
+
+			var xSpread = 24;
+			var zSpread = 24;
+
+			for (var i = 0; i < 60; i++)
+			{
+				var cylinder = new THREE.Mesh( cylinderG, material ); 
+
+				cylinder.position.y = 0.5;
+
+				cylinder.position.x = Math.random() * xSpread - xSpread / 2;
+				cylinder.position.z = Math.random() * zSpread - zSpread / 2;
+
+
+				scene.add( cylinder );
+			}
+
+			
+			var controlElement = document.body;
+			var pressed={};
+			controlElement.onkeydown=function(e){
+			     e = e || window.event;
+			     pressed[e.keyCode] = true;
+			}
+
+			controlElement.onkeyup=function(e){
+			     e = e || window.event;
+			     delete pressed[e.keyCode];
+			}
+
+			var stepSize = 0.1;
+			var turnSize = 0.02;
+			var cameraLookDirection = new THREE.Vector3(0, 0, 1);
+
+
+			var imgCtx = renderer.domElement.getContext('2d');
+			var oldImage;
+			var width = rendererParrentDomElement.clientWidth;
+			var height = rendererParrentDomElement.clientHeight;
+			calculator = new FlowCalculator(4);
+
+			var flowOutScene = document.getElementById('flowOut');
+			sceneCtx = flowOutScene.getContext('2d');
+			var sceneWidth = width;
+			var sceneHeight = height;
+
+			var render = function () {
+				requestAnimationFrame( render );
+
+				if (pressed['W'.charCodeAt(0)])
+				{
+					var moveStep = cameraLookDirection.clone().multiplyScalar(stepSize);
+					camera.position.add(moveStep);
+				}
+				if (pressed['S'.charCodeAt(0)])
+				{
+					var moveStep = cameraLookDirection.clone().multiplyScalar(-stepSize);
+					camera.position.add(moveStep);
+				}
+				if (pressed['D'.charCodeAt(0)])
+				{
+					cameraLookDirection.applyAxisAngle(new THREE.Vector3( 0, 1, 0 ), -turnSize);
+				}
+				if (pressed['A'.charCodeAt(0)])
+				{
+					cameraLookDirection.applyAxisAngle(new THREE.Vector3( 0, 1, 0 ), turnSize);
+				}
+
+				var currentLookDirection = new THREE.Vector3().addVectors(camera.position, cameraLookDirection);
+				camera.lookAt(currentLookDirection);
+
+				renderer.render(scene, camera);
+
+				var newImage = imgCtx.getImageData(0, 0, width, height).data;
+
+				if (newImage && oldImage) {
+					var zones = calculator.calculate(oldImage, newImage, width, height).zones;
+
+					sceneCtx.clearRect(0, 0, sceneWidth, sceneHeight);
+					for(var i = 0; i < zones.length; ++i) {
+						var zone = zones[i];
+						sceneCtx.strokeStyle = getDirectionalColor(zone.u, zone.v);
+						sceneCtx.beginPath();
+						sceneCtx.moveTo(zone.x,zone.y);
+						sceneCtx.lineTo((zone.x - zone.u), zone.y + zone.v);
+						sceneCtx.stroke();
+					}
+				}
+				oldImage = newImage;
+			};
+
+			render();
+		</script>
+	</body>
+</html>
