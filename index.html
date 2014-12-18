@@ -17,16 +17,17 @@
 		</style>
 	</head>
 	<body>
-
 		<div id="camInput"> </div>
 		<div id="flowOutContainer"><canvas id="flowOut"></canvas></div>
-		<script src="js/three.min.js"></script>
-		<script src="js/Projector.js"></script>
-		<script src="js/CanvasRenderer.js"></script>
-		<script src="js/flowzone.js"></script>
-		<script src="js/flowCalculator.js"></script>
-		<script src="js/colors.js"></script>
+		
+		<script src="js/ext/three.min.js"></script>
+		<script src="js/ext/Projector.js"></script>
+		<script src="js/ext/CanvasRenderer.js"></script>
+		<script src="js/ext/flowzone.js"></script>
+		<script src="js/ext/flowCalculator.js"></script>
+		<script src="js/ext/colors.js"></script>
 
+		<script src="js/navController.js"></script>
 		<script>
 			var rendererParrentDomElement = document.getElementById("camInput");
 
@@ -73,22 +74,7 @@
 			}
 
 			
-			var controlElement = document.body;
-			var pressed={};
-			controlElement.onkeydown=function(e){
-			     e = e || window.event;
-			     pressed[e.keyCode] = true;
-			}
-
-			controlElement.onkeyup=function(e){
-			     e = e || window.event;
-			     delete pressed[e.keyCode];
-			}
-
-			var stepSize = 0.1;
-			var turnSize = 0.02;
-			var cameraLookDirection = new THREE.Vector3(0, 0, 1);
-
+			var nav = new NavController(camera, document.body, 0.1, 0.02);
 
 			var imgCtx = renderer.domElement.getContext('2d');
 			var oldImage;
@@ -104,28 +90,7 @@
 			var render = function () {
 				requestAnimationFrame( render );
 
-				if (pressed['W'.charCodeAt(0)])
-				{
-					var moveStep = cameraLookDirection.clone().multiplyScalar(stepSize);
-					camera.position.add(moveStep);
-				}
-				if (pressed['S'.charCodeAt(0)])
-				{
-					var moveStep = cameraLookDirection.clone().multiplyScalar(-stepSize);
-					camera.position.add(moveStep);
-				}
-				if (pressed['D'.charCodeAt(0)])
-				{
-					cameraLookDirection.applyAxisAngle(new THREE.Vector3( 0, 1, 0 ), -turnSize);
-				}
-				if (pressed['A'.charCodeAt(0)])
-				{
-					cameraLookDirection.applyAxisAngle(new THREE.Vector3( 0, 1, 0 ), turnSize);
-				}
-
-				var currentLookDirection = new THREE.Vector3().addVectors(camera.position, cameraLookDirection);
-				camera.lookAt(currentLookDirection);
-
+				nav.processInput();
 				renderer.render(scene, camera);
 
 				var newImage = imgCtx.getImageData(0, 0, width, height).data;
