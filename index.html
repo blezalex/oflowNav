@@ -19,7 +19,7 @@
 	<body>
 		<div id="camInput"> </div>
 		<div id="flowOutContainer"><canvas id="flowOut"></canvas></div>
-		
+
 		<script src="js/ext/three.min.js"></script>
 		<script src="js/ext/Projector.js"></script>
 		<script src="js/ext/CanvasRenderer.js"></script>
@@ -80,7 +80,7 @@
 			var oldImage;
 			var width = rendererParrentDomElement.clientWidth;
 			var height = rendererParrentDomElement.clientHeight;
-			calculator = new FlowCalculator(4);
+			calculator = new FlowCalculator(16);
 
 			var flowOutScene = document.getElementById('flowOut');
 			sceneCtx = flowOutScene.getContext('2d');
@@ -93,21 +93,24 @@
 				nav.processInput();
 				renderer.render(scene, camera);
 
-				var newImage = imgCtx.getImageData(0, 0, width, height).data;
+				var newImage = imgCtx.getImageData(0, 0, width, height);
 
-				if (newImage && oldImage) {
-					var zones = calculator.calculate(oldImage, newImage, width, height).zones;
+				// if (newImage && oldImage) {
+				// 	var zones = calculator.calculate(oldImage.data, newImage.data, width, height).zones;
 
-					sceneCtx.clearRect(0, 0, sceneWidth, sceneHeight);
-					for(var i = 0; i < zones.length; ++i) {
-						var zone = zones[i];
-						sceneCtx.strokeStyle = getDirectionalColor(zone.u, zone.v);
-						sceneCtx.beginPath();
-						sceneCtx.moveTo(zone.x,zone.y);
-						sceneCtx.lineTo((zone.x - zone.u), zone.y + zone.v);
-						sceneCtx.stroke();
-					}
-				}
+				// 	//sceneCtx.clearRect(0, 0, sceneWidth, sceneHeight);
+				// 	for(var i = 0; i < zones.length; ++i) {
+				// 		var zone = zones[i];
+				// 		sceneCtx.strokeStyle = getDirectionalColor(zone.u, zone.v);
+				// 		sceneCtx.beginPath();
+				// 		sceneCtx.moveTo(zone.x,zone.y);
+				// 		sceneCtx.lineTo((zone.x - zone.u), zone.y + zone.v);
+				// 		sceneCtx.stroke();
+				// 	}
+				// }
+
+				sceneCtx.putImageData(newImage, 0, 0);
+
 				oldImage = newImage;
 			};
 
