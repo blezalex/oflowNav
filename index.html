@@ -25,7 +25,7 @@
 		<script src="js/ext/three.min.js"></script>
 		<script src="js/ext/Projector.js"></script>
 		<script src="js/ext/CanvasRenderer.js"></script>
-		<script src="js/ext/oflow/flowzone.js"></script>
+		<script src="js/ext/oflow/flowZone.js"></script>
 		<script src="js/ext/oflow/flowCalculator.js"></script>
 		<script src="js/ext/oflow/colors.js"></script>
 
@@ -36,17 +36,17 @@
 			var scene = new THREE.Scene();
 			var camera = new THREE.PerspectiveCamera( 75, rendererParrentDomElement.clientWidth/rendererParrentDomElement.clientHeight, 0.1, 1000 );
 
-			//var renderer = new THREE.WebGLRenderer( {     preserveDrawingBuffer: true  });
-			var renderer = new THREE.CanvasRenderer();
+			var renderer = new THREE.WebGLRenderer( {     preserveDrawingBuffer: true  });
+			//var renderer = new THREE.CanvasRenderer();
 
 			renderer.setSize( rendererParrentDomElement.clientWidth, rendererParrentDomElement.clientHeight );
 			rendererParrentDomElement.appendChild( renderer.domElement );
 
 			var light = new THREE.PointLight( 0xffffff, 1, 100 ); 
-			light.position.set( 5, 5, -5 ); 
+			light.position.set( 4, 6, -4 ); 
 			scene.add( light );
 
-			var alight = new THREE.AmbientLight( 0x202020 ); // soft white light 
+			var alight = new THREE.AmbientLight( 0x505050 ); // soft white light 
 			scene.add( alight );
 
 			var planeG = new THREE.PlaneGeometry( 50, 50); 
@@ -62,12 +62,12 @@
 			imgTexture.repeat.set( 4, 2 );
 			imgTexture.wrapS = imgTexture.wrapT = THREE.RepeatWrapping;
 			imgTexture.anisotropy = 16;
-			var material = new THREE.MeshLambertMaterial( { map: imgTexture, color: 0xFFff00, ambient: 0x777777, shading: THREE.SmoothShading } );
+			var material = new THREE.MeshLambertMaterial( { map: imgTexture, color: 0xFFff00, ambient: 0x999999, shading: THREE.SmoothShading } );
 
-			var xSpread = 24;
-			var zSpread = 24;
+			var xSpread = 48;
+			var zSpread = 48;
 
-			for (var i = 0; i < 60; i++)
+			for (var i = 0; i < 200; i++)
 			{
 				var cylinder = new THREE.Mesh( cylinderG, material ); 
 
@@ -97,6 +97,18 @@
 			var midPoint = width / 2;
 			var magnIndicationElements = [document.getElementById("magnLeft"), document.getElementById("magnRight")];
 			
+			var proxyCanvas = document.createElement("canvas");
+			proxyCanvas.setAttribute('height', height);
+			proxyCanvas.setAttribute('width', width);
+
+			var proxyContext = proxyCanvas.getContext('2d');
+
+			//  === Observations: ===
+			//  1. Alg will hit an obstacles when flow on both sides is equal (may be high), it wont look for path around the obstacles. 
+			//  	Should it look for expansion point instead? 
+
+			//  2. Alg makes decision on the stop, no path planning at all
+
 			var magnitudes = [0,0];
 			var render = function () {
 				requestAnimationFrame( render );
@@ -104,35 +116,35 @@
 				renderer.render(scene, camera);
 
 				if (nav.processInput(magnitudes))	{
-					var newImage = imgCtx.getImageData(0, 0, width, height);
 
-				magnitudes = [0,0]; // reset magnitudes
-				if (newImage && oldImage) {
-					var zones = calculator.calculate(oldImage.data, newImage.data, width, height).zones;
+			     		proxyContext.drawImage(renderer.domElement, 0, 0);
 
-					sceneCtx.clearRect(0, 0, sceneWidth, sceneHeight);
+						var newImage = proxyContext.getImageData(0, 0, width, height);
 
-					for(var i = 0; i < zones.length; ++i) {
-						var zone = zones[i];
-						magnitudes[zone.x > midPoint ? 1 : 0] += Math.abs(zone.u) + Math.abs(zone.v);
+						magnitudes = [0,0]; // reset magnitudes
+						if (newImage && oldImage) {
+							var zones = calculator.calculate(oldImage.data, newImage.data, width, height).zones;
+ 							sceneCtx.clearRect(0, 0, sceneWidth, sceneHeight);
 
-						sceneCtx.strokeStyle = getDirectionalColor(zone.u, zone.v);
-						sceneCtx.beginPath();
-						sceneCtx.moveTo(zone.x,zone.y);
-						sceneCtx.lineTo((zone.x - zone.u), zone.y + zone.v);
-						sceneCtx.stroke();
-					}
+							for(var i = 0; i < zones.length; ++i) {
+								var zone = zones[i];
+								magnitudes[zone.x > midPoint ? 1 : 0] += Math.abs(zone.u) + Math.abs(zone.v);
 
-					for (var i = 0; i < magnitudes.length; i++)
-					{
-						magnIndicationElements[i].innerText = magnitudes[i];
-					}
-					
+								sceneCtx.strokeStyle = getDirectionalColor(zone.u, zone.v);
+								sceneCtx.beginPath();
+								sceneCtx.moveTo(zone.x,zone.y);
+								sceneCtx.lineTo((zone.x - zone.u), zone.y + zone.v);
+								sceneCtx.stroke();
+							}
+
+							for (var i = 0; i < magnitudes.length; i++)
+							{
+								magnIndicationElements[i].innerText = magnitudes[i];
+							}
+							
+						}
+						oldImage = newImage;
 				}
-
-				}
-
-				oldImage = newImage;
 			};
 
 			render();
