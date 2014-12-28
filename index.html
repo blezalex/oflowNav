@@ -10,22 +10,24 @@
 				height: 600px;
 			}
 
-			#flowOutContainer {
+			#flowOutContainer, #flowOut {
 				width: 800px;
 				height: 600px;
 			}
+
 		</style>
 	</head>
 	<body>
 		<div id="camInput"> </div>
-		<div id="flowOutContainer"><canvas id="flowOut"></canvas></div>
+		<div id="flowOutContainer"><canvas id="flowOut" width="800" height="600"></canvas></div>
+		<div><span id="magnLeft"></span> <span id="magnRight"></span></div>
 
 		<script src="js/ext/three.min.js"></script>
 		<script src="js/ext/Projector.js"></script>
 		<script src="js/ext/CanvasRenderer.js"></script>
-		<script src="js/ext/flowzone.js"></script>
-		<script src="js/ext/flowCalculator.js"></script>
-		<script src="js/ext/colors.js"></script>
+		<script src="js/ext/oflow/flowzone.js"></script>
+		<script src="js/ext/oflow/flowCalculator.js"></script>
+		<script src="js/ext/oflow/colors.js"></script>
 
 		<script src="js/navController.js"></script>
 		<script>
@@ -55,7 +57,12 @@
 
 			var cylinderRadius = 0.3;
 			var cylinderG = new THREE.CylinderGeometry(cylinderRadius, cylinderRadius, 4);
-			var material = new THREE.MeshLambertMaterial( { color: 0x00ff00 } );
+
+			var imgTexture = THREE.ImageUtils.loadTexture( "img/lavatile.jpg" );
+			imgTexture.repeat.set( 4, 2 );
+			imgTexture.wrapS = imgTexture.wrapT = THREE.RepeatWrapping;
+			imgTexture.anisotropy = 16;
+			var material = new THREE.MeshLambertMaterial( { map: imgTexture, color: 0xFFff00, ambient: 0x777777, shading: THREE.SmoothShading } );
 
 			var xSpread = 24;
 			var zSpread = 24;
@@ -80,36 +87,50 @@
 			var oldImage;
 			var width = rendererParrentDomElement.clientWidth;
 			var height = rendererParrentDomElement.clientHeight;
-			calculator = new FlowCalculator(16);
+			calculator = new FlowCalculator(8);
 
 			var flowOutScene = document.getElementById('flowOut');
 			sceneCtx = flowOutScene.getContext('2d');
 			var sceneWidth = width;
 			var sceneHeight = height;
 
+			var midPoint = width / 2;
+			var magnIndicationElements = [document.getElementById("magnLeft"), document.getElementById("magnRight")];
+			
+			var magnitudes = [0,0];
 			var render = function () {
 				requestAnimationFrame( render );
 
-				nav.processInput();
 				renderer.render(scene, camera);
 
-				var newImage = imgCtx.getImageData(0, 0, width, height);
+				if (nav.processInput(magnitudes))	{
+					var newImage = imgCtx.getImageData(0, 0, width, height);
 
-				// if (newImage && oldImage) {
-				// 	var zones = calculator.calculate(oldImage.data, newImage.data, width, height).zones;
+				magnitudes = [0,0]; // reset magnitudes
+				if (newImage && oldImage) {
+					var zones = calculator.calculate(oldImage.data, newImage.data, width, height).zones;
 
-				// 	//sceneCtx.clearRect(0, 0, sceneWidth, sceneHeight);
-				// 	for(var i = 0; i < zones.length; ++i) {
-				// 		var zone = zones[i];
-				// 		sceneCtx.strokeStyle = getDirectionalColor(zone.u, zone.v);
-				// 		sceneCtx.beginPath();
-				// 		sceneCtx.moveTo(zone.x,zone.y);
-				// 		sceneCtx.lineTo((zone.x - zone.u), zone.y + zone.v);
-				// 		sceneCtx.stroke();
-				// 	}
-				// }
+					sceneCtx.clearRect(0, 0, sceneWidth, sceneHeight);
 
-				sceneCtx.putImageData(newImage, 0, 0);
+					for(var i = 0; i < zones.length; ++i) {
+						var zone = zones[i];
+						magnitudes[zone.x > midPoint ? 1 : 0] += Math.abs(zone.u) + Math.abs(zone.v);
+
+						sceneCtx.strokeStyle = getDirectionalColor(zone.u, zone.v);
+						sceneCtx.beginPath();
+						sceneCtx.moveTo(zone.x,zone.y);
+						sceneCtx.lineTo((zone.x - zone.u), zone.y + zone.v);
+						sceneCtx.stroke();
+					}
+
+					for (var i = 0; i < magnitudes.length; i++)
+					{
+						magnIndicationElements[i].innerText = magnitudes[i];
+					}
+					
+				}
+
+				}
 
 				oldImage = newImage;
 			};
