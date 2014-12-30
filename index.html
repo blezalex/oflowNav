@@ -23,97 +23,103 @@
 		<div><span id="magnLeft"></span> <span id="magnRight"></span></div>
 
 		<script src="js/ext/three.min.js"></script>
-		<script src="js/ext/Projector.js"></script>
-		<script src="js/ext/CanvasRenderer.js"></script>
-		<script src="js/ext/oflow/flowZone.js"></script>
-		<script src="js/ext/oflow/flowCalculator.js"></script>
+
 		<script src="js/ext/oflow/colors.js"></script>
+		<script src="js/ext/oflow/oflow.js"></script>
 
 		<script src="js/navController.js"></script>
+		<script src="js/CanvasImageCapturer.js"></script>
+
 		<script>
+
+			function addObstacles(scene, worldWidth, worldDepth, count) {
+				var radius = 0.3;
+				var geometry = new THREE.CylinderGeometry(radius, radius, 4);
+
+				var texture = THREE.ImageUtils.loadTexture( "img/lavatile.jpg" );
+				texture.repeat.set( 4, 2 );
+				texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+				texture.anisotropy = 16;
+				var material = new THREE.MeshLambertMaterial( { map: texture, color: 0xFFff00, ambient: 0x999999, shading: THREE.SmoothShading } );
+
+				for (var i = 0; i < count; i++)
+				{
+					var cylinder = new THREE.Mesh(geometry, material ); 
+
+					cylinder.position.y = 0.5;
+
+					cylinder.position.x = Math.random() * worldWidth - worldWidth / 2;
+					cylinder.position.z = Math.random() * worldDepth - worldDepth / 2;
+
+					scene.add( cylinder );
+				}
+			}
+
+			function addFloor(scene, worldWidth, worldDepth) {
+				var planeG = new THREE.PlaneGeometry( worldWidth, worldDepth); 
+				var material = new THREE.MeshLambertMaterial( {color: 0xffff00, side: THREE.DoubleSide} ); 
+				var plane = new THREE.Mesh( planeG, material ); 
+				plane.rotation.x = Math.PI /2
+				scene.add( plane );
+			}
+
+			function addLights(scene) {
+				var light = new THREE.PointLight( 0xffffff, 1, 100 ); 
+				light.position.set( 4, 6, -4 ); 
+				scene.add( light );
+
+				var alight = new THREE.AmbientLight( 0x505050 ); // soft white light 
+				scene.add( alight );
+			}
+
+			function addGoal(scene, position) {
+				var geometry = new THREE.SphereGeometry( 0.4, 32, 32 ); 
+				var material = new THREE.MeshLambertMaterial( {color: 0x00ff00} ); 
+				var sphere = new THREE.Mesh( geometry, material ); 
+				sphere.position.copy(position);
+				scene.add( sphere );
+			}
+
+			// center of the world is in 0,0 
+			var worldWidth = 50;
+			var worldDepth = 50;
+
 			var rendererParrentDomElement = document.getElementById("camInput");
-
-			var scene = new THREE.Scene();
-			var camera = new THREE.PerspectiveCamera( 75, rendererParrentDomElement.clientWidth/rendererParrentDomElement.clientHeight, 0.1, 1000 );
-
-			var renderer = new THREE.WebGLRenderer( {     preserveDrawingBuffer: true  });
-			//var renderer = new THREE.CanvasRenderer();
-
+			var renderer = new THREE.WebGLRenderer( { preserveDrawingBuffer: true });
 			renderer.setSize( rendererParrentDomElement.clientWidth, rendererParrentDomElement.clientHeight );
 			rendererParrentDomElement.appendChild( renderer.domElement );
 
-			var light = new THREE.PointLight( 0xffffff, 1, 100 ); 
-			light.position.set( 4, 6, -4 ); 
-			scene.add( light );
+			var camera = new THREE.PerspectiveCamera( 75, rendererParrentDomElement.clientWidth/rendererParrentDomElement.clientHeight, 0.1, 1000 );
+			var scene = new THREE.Scene();
 
-			var alight = new THREE.AmbientLight( 0x505050 ); // soft white light 
-			scene.add( alight );
+			addLights(scene);
+			addFloor(scene, worldWidth, worldDepth);
 
-			var planeG = new THREE.PlaneGeometry( 50, 50); 
-			var material = new THREE.MeshLambertMaterial( {color: 0xffff00, side: THREE.DoubleSide} ); 
-			var plane = new THREE.Mesh( planeG, material ); 
-			plane.rotation.x = Math.PI /2
-			scene.add( plane );
+			addObstacles(scene, worldWidth, worldDepth, 200)
 
-			var cylinderRadius = 0.3;
-			var cylinderG = new THREE.CylinderGeometry(cylinderRadius, cylinderRadius, 4);
+			//==  goal  ==
+			var goalPostion = new THREE.Vector3(worldWidth / 2, 0, worldDepth / 2); // goal is at the end of the world
+			addGoal(scene, goalPostion);
 
-			var imgTexture = THREE.ImageUtils.loadTexture( "img/lavatile.jpg" );
-			imgTexture.repeat.set( 4, 2 );
-			imgTexture.wrapS = imgTexture.wrapT = THREE.RepeatWrapping;
-			imgTexture.anisotropy = 16;
-			var material = new THREE.MeshLambertMaterial( { map: imgTexture, color: 0xFFff00, ambient: 0x999999, shading: THREE.SmoothShading } );
-
-			var xSpread = 48;
-			var zSpread = 48;
-
-			for (var i = 0; i < 200; i++)
-			{
-				var cylinder = new THREE.Mesh( cylinderG, material ); 
-
-				cylinder.position.y = 0.5;
-
-				cylinder.position.x = Math.random() * xSpread - xSpread / 2;
-				cylinder.position.z = Math.random() * zSpread - zSpread / 2;
+			//== position camera ==
+			camera.position.x = -worldWidth / 2 / 2;
+			camera.position.z = -worldDepth / 2 / 2;
 
 
-				scene.add( cylinder );
-			}
-
-			var goalPostion = [xSpread /2, zSpread / 2];
-			camera.position.x = - xSpread /2 / 2;
-			camera.position.z = - zSpread /2 / 2;
-
-
-			var geometry = new THREE.SphereGeometry( 0.4, 32, 32 ); 
-			var material = new THREE.MeshLambertMaterial( {color: 0x00ff00} ); 
-			var sphere = new THREE.Mesh( geometry, material ); 
-			scene.add( sphere );
-			sphere.position.x = goalPostion[0];
-			sphere.position.z = goalPostion[1];
-
-			
 			var nav = new NavController(camera, document.body, 0.1, 0.02, goalPostion);
 
-			var imgCtx = renderer.domElement.getContext('2d');
 			var oldImage;
 			var width = rendererParrentDomElement.clientWidth;
 			var height = rendererParrentDomElement.clientHeight;
-			calculator = new FlowCalculator(6);
+			calculator = new oflow.FlowCalculator(6);
 
-			var flowOutScene = document.getElementById('flowOut');
-			sceneCtx = flowOutScene.getContext('2d');
-			var sceneWidth = width;
-			var sceneHeight = height;
+			sceneCtx = document.getElementById('flowOut').getContext('2d');
 
 			var midPoint = width / 2;
 			var magnIndicationElements = [document.getElementById("magnLeft"), document.getElementById("magnRight")];
 			
-			var proxyCanvas = document.createElement("canvas");
-			proxyCanvas.setAttribute('height', height);
-			proxyCanvas.setAttribute('width', width);
+			var imgCapturer = new CanvasImageCapturer(renderer.domElement);
 
-			var proxyContext = proxyCanvas.getContext('2d');
 
 			//  === Observations: ===
 			//  1. Alg will hit an obstacles when flow on both sides is equal (may be high), it wont look for path around the obstacles. 
@@ -128,15 +134,12 @@
 				renderer.render(scene, camera);
 
 				if (nav.processInput(magnitudes))	{
-
-			     		proxyContext.drawImage(renderer.domElement, 0, 0);
-
-						var newImage = proxyContext.getImageData(0, 0, width, height);
+						var newImage = imgCapturer.getImageData();
 
 						magnitudes = [0,0]; // reset magnitudes
 						if (newImage && oldImage) {
 							var zones = calculator.calculate(oldImage.data, newImage.data, width, height).zones;
- 							sceneCtx.clearRect(0, 0, sceneWidth, sceneHeight);
+ 							sceneCtx.clearRect(0, 0, width, height);
 
 							for(var i = 0; i < zones.length; ++i) {
 								var zone = zones[i];

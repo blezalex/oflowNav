@@ -49,7 +49,7 @@ NavController.prototype.processInput = function(magnitudes){
 
 	if (pressed['T'.charCodeAt(0)])
 	{
-		var vectorLookingAtGoal = new THREE.Vector3(this.goalPosition[0] - camera.position.x, camera.position.y, this.goalPosition[1] - camera.position.z);
+		var vectorLookingAtGoal = new THREE.Vector3(this.goalPosition.x - camera.position.x, camera.position.y, this.goalPosition.z - camera.position.z);
 
 		var navTurnRate = Math.atan2(this.cameraLookDirection.z, this.cameraLookDirection.x) - Math.atan2(vectorLookingAtGoal.z, vectorLookingAtGoal.x);
 		
@@ -65,7 +65,7 @@ NavController.prototype.processInput = function(magnitudes){
 			magnitureBasedTurnRate = 1000;
 
 
-		var vectorLookingAtGoal = new THREE.Vector3(this.goalPosition[0] - camera.position.x, camera.position.y, this.goalPosition[1] - camera.position.z);
+		var vectorLookingAtGoal = new THREE.Vector3(this.goalPosition.x - camera.position.x, camera.position.y, this.goalPosition.z - camera.position.z);
 		var navTurnRate = Math.atan2(this.cameraLookDirection.z, this.cameraLookDirection.x) - Math.atan2(vectorLookingAtGoal.z, vectorLookingAtGoal.x);
 
 		if (navTurnRate > Math.PI / 2)

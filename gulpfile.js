@@ -77,8 +77,8 @@ gulp.task('watch changes', watchChanges);
 function watchChanges() {
   gulp.watch(paths.scripts, ['browserify']);
  // gulp.watch('src/styles/*.less', ['compile less']);
-  gulp.watch(paths.markup, ['copy dist']);
-  gulp.watch('dist/**').on('change', notifyLivereload);
+ // gulp.watch(paths.markup, ['copy dist']);
+  gulp.watch(devServer.root).on('change', notifyLivereload);
 }
 
 function getRandomPortBasedOnPath(seed) {
