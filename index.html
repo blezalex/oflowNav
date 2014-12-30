@@ -80,14 +80,26 @@
 				scene.add( cylinder );
 			}
 
+			var goalPostion = [xSpread /2, zSpread / 2];
+			camera.position.x = - xSpread /2 / 2;
+			camera.position.z = - zSpread /2 / 2;
+
+
+			var geometry = new THREE.SphereGeometry( 0.4, 32, 32 ); 
+			var material = new THREE.MeshLambertMaterial( {color: 0x00ff00} ); 
+			var sphere = new THREE.Mesh( geometry, material ); 
+			scene.add( sphere );
+			sphere.position.x = goalPostion[0];
+			sphere.position.z = goalPostion[1];
+
 			
-			var nav = new NavController(camera, document.body, 0.1, 0.02);
+			var nav = new NavController(camera, document.body, 0.1, 0.02, goalPostion);
 
 			var imgCtx = renderer.domElement.getContext('2d');
 			var oldImage;
 			var width = rendererParrentDomElement.clientWidth;
 			var height = rendererParrentDomElement.clientHeight;
-			calculator = new FlowCalculator(8);
+			calculator = new FlowCalculator(6);
 
 			var flowOutScene = document.getElementById('flowOut');
 			sceneCtx = flowOutScene.getContext('2d');

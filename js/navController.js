@@ -1,8 +1,10 @@
-function NavController(camera, controlElement, stepSize, turnRate) 	{
+function NavController(camera, controlElement, stepSize, turnRate, goalPosition) 	{
 	this.camera  = camera;
 	this.controlElement = controlElement;
 	this.stepSize = stepSize;
 	this.turnRate = turnRate;
+
+	this.goalPosition = goalPosition;
 
 	pressed={};
 	this.pressed = pressed;
@@ -45,6 +47,16 @@ NavController.prototype.processInput = function(magnitudes){
 		moved = true;
 	}
 
+	if (pressed['T'.charCodeAt(0)])
+	{
+		var vectorLookingAtGoal = new THREE.Vector3(this.goalPosition[0] - camera.position.x, camera.position.y, this.goalPosition[1] - camera.position.z);
+
+		var navTurnRate = Math.atan2(this.cameraLookDirection.z, this.cameraLookDirection.x) - Math.atan2(vectorLookingAtGoal.z, vectorLookingAtGoal.x);
+		
+
+		this.cameraLookDirection.applyAxisAngle(new THREE.Vector3( 0, 1, 0 ), this.turnRate * (navTurnRate));
+	}
+
 	if (pressed['Q'.charCodeAt(0)])
 	{
 		var magnitureBasedTurnRate = magnitudes[0] - magnitudes[1];
@@ -53,7 +65,16 @@ NavController.prototype.processInput = function(magnitudes){
 			magnitureBasedTurnRate = 1000;
 
 
-		this.cameraLookDirection.applyAxisAngle(new THREE.Vector3( 0, 1, 0 ), this.turnRate * (-magnitureBasedTurnRate/500));
+		var vectorLookingAtGoal = new THREE.Vector3(this.goalPosition[0] - camera.position.x, camera.position.y, this.goalPosition[1] - camera.position.z);
+		var navTurnRate = Math.atan2(this.cameraLookDirection.z, this.cameraLookDirection.x) - Math.atan2(vectorLookingAtGoal.z, vectorLookingAtGoal.x);
+
+		if (navTurnRate > Math.PI / 2)
+			navTurnRate = Math.PI / 2;
+
+		if (navTurnRate < -Math.PI / 2)
+			navTurnRate = -Math.PI / 2;
+
+		this.cameraLookDirection.applyAxisAngle(new THREE.Vector3( 0, 1, 0 ), this.turnRate * ((-magnitureBasedTurnRate/500) + navTurnRate * 2));
 
 		moved = true;
 	}
