@@ -1,4 +1,4 @@
-<html>
+<html ng-app="oflowNav">
 	<head>
 		<title>My first Three.js app</title>
 		<style>
@@ -15,13 +15,38 @@
 				height: 600px;
 			}
 
+			#camInput, .controlPanel {
+				display: inline-block;
+				vertical-align: top;
+			}
+
 		</style>
+
+		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap.min.css">
 	</head>
-	<body>
+	<body ng-controller="mainCtrl">
 		<div id="camInput"> </div>
+		<div class="controlPanel">
+			<h3>
+				Controls:
+			</h3>			
+			<p>
+				<button ng-click="navigate()" class="btn btn-primary" ng-disabled="runToEnd">Navigate</button>
+			</p>
+
+			<p>
+				<button ng-click="reset()" class="btn btn-warning">Rebuild</button>
+			</p>
+			<p>
+				Obstacles: <input type="number" ng-model="obstacleCnt">
+			</p>
+			<div class="alert alert-success" ng-show="missonComplete">Mission complete</div>
+		</div>
+		
 		<div id="flowOutContainer"><canvas id="flowOut" width="800" height="600"></canvas></div>
 		<div><span id="magnLeft"></span> <span id="magnRight"></span></div>
 
+		<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.8/angular.min.js"></script>
 		<script src="js/ext/three.min.js"></script>
 
 		<script src="js/ext/oflow/colors.js"></script>
@@ -29,9 +54,9 @@
 
 		<script src="js/navController.js"></script>
 		<script src="js/CanvasImageCapturer.js"></script>
+		<script src="js/Autopilot.js"></script>
 
-		<script>
-
+		<script type="text/javascript">
 			function addObstacles(scene, worldWidth, worldDepth, count) {
 				var radius = 0.3;
 				var geometry = new THREE.CylinderGeometry(radius, radius, 4);
@@ -80,89 +105,92 @@
 				scene.add( sphere );
 			}
 
-			// center of the world is in 0,0 
-			var worldWidth = 50;
-			var worldDepth = 50;
+			function setupWorld(camera, worldWidth, worldDepth, goalPostion, obstacleCnt){
+				var scene = new THREE.Scene();
 
-			var rendererParrentDomElement = document.getElementById("camInput");
-			var renderer = new THREE.WebGLRenderer( { preserveDrawingBuffer: true });
-			renderer.setSize( rendererParrentDomElement.clientWidth, rendererParrentDomElement.clientHeight );
-			rendererParrentDomElement.appendChild( renderer.domElement );
+				addLights(scene);
+				addFloor(scene, worldWidth, worldDepth);
+				addObstacles(scene, worldWidth, worldDepth, obstacleCnt)			
+				addGoal(scene, goalPostion);
 
-			var camera = new THREE.PerspectiveCamera( 75, rendererParrentDomElement.clientWidth/rendererParrentDomElement.clientHeight, 0.1, 1000 );
-			var scene = new THREE.Scene();
+				//== position camera ==
+				camera.position.x = -worldWidth / 2 / 2;
+				camera.position.z = -worldDepth / 2 / 2;
 
-			addLights(scene);
-			addFloor(scene, worldWidth, worldDepth);
+				return scene;
+			}
 
-			addObstacles(scene, worldWidth, worldDepth, 200)
+			function goalReached(currentPostion, goalPostion) {
+				return currentPostion.distanceTo(goalPostion) < 2;
+			}
 
-			//==  goal  ==
-			var goalPostion = new THREE.Vector3(worldWidth / 2, 0, worldDepth / 2); // goal is at the end of the world
-			addGoal(scene, goalPostion);
+			var app = angular.module("oflowNav", []);
 
-			//== position camera ==
-			camera.position.x = -worldWidth / 2 / 2;
-			camera.position.z = -worldDepth / 2 / 2;
+			app.controller('mainCtrl', ['$scope', function($scope){
+				var rendererParrentDomElement = document.getElementById('camInput');
+				var renderer = new THREE.WebGLRenderer( { preserveDrawingBuffer: true });
+				renderer.setSize( rendererParrentDomElement.clientWidth, rendererParrentDomElement.clientHeight );
+				rendererParrentDomElement.appendChild( renderer.domElement );
 
+				var camera = new THREE.PerspectiveCamera( 75, rendererParrentDomElement.clientWidth/rendererParrentDomElement.clientHeight, 0.1, 1000 );
+				
+				// center of the world is in 0,0 
+				var worldWidth = 50;
+				var worldDepth = 50;
 
-			var nav = new NavController(camera, document.body, 0.1, 0.02, goalPostion);
+				var goalPostion = new THREE.Vector3(worldWidth / 2, 0, worldDepth / 2); // goal is at the end of the world
+				var scene;
 
-			var oldImage;
-			var width = rendererParrentDomElement.clientWidth;
-			var height = rendererParrentDomElement.clientHeight;
-			calculator = new oflow.FlowCalculator(6);
+				var autopilot = new Autopilot(renderer.domElement, document.getElementById('flowOut'));
+				autopilot.setTarget(goalPostion);
 
-			sceneCtx = document.getElementById('flowOut').getContext('2d');
+				var cameraLookDirection = new THREE.Vector3(0, 0, 1);
+				var nav = new NavController(camera, document.body, 0.1, 0.02, goalPostion, autopilot);
 
-			var midPoint = width / 2;
-			var magnIndicationElements = [document.getElementById("magnLeft"), document.getElementById("magnRight")];
-			
-			var imgCapturer = new CanvasImageCapturer(renderer.domElement);
+				var render = function () {
+					requestAnimationFrame( render );
 
+					renderer.render(scene, camera);
 
-			//  === Observations: ===
-			//  1. Alg will hit an obstacles when flow on both sides is equal (may be high), it wont look for path around the obstacles. 
-			//  	Should it look for expansion point instead? 
+					if (!$scope.runToEnd)
+						nav.processInput(cameraLookDirection);
+					else
+					{
+						var nextStep = autopilot.getNextStep(cameraLookDirection, camera.position);
 
-			//  2. Alg makes decision on the stop, no path planning at all
+						camera.position.add(nextStep[0]);
+						cameraLookDirection.copy(nextStep[1]);
+						
+						var currentLookDirection = new THREE.Vector3().addVectors(camera.position, cameraLookDirection);
+						camera.lookAt(currentLookDirection);
 
-			var magnitudes = [0,0];
-			var render = function () {
-				requestAnimationFrame( render );
-
-				renderer.render(scene, camera);
-
-				if (nav.processInput(magnitudes))	{
-						var newImage = imgCapturer.getImageData();
-
-						magnitudes = [0,0]; // reset magnitudes
-						if (newImage && oldImage) {
-							var zones = calculator.calculate(oldImage.data, newImage.data, width, height).zones;
- 							sceneCtx.clearRect(0, 0, width, height);
-
-							for(var i = 0; i < zones.length; ++i) {
-								var zone = zones[i];
-								magnitudes[zone.x > midPoint ? 1 : 0] += Math.abs(zone.u) + Math.abs(zone.v);
-
-								sceneCtx.strokeStyle = getDirectionalColor(zone.u, zone.v);
-								sceneCtx.beginPath();
-								sceneCtx.moveTo(zone.x,zone.y);
-								sceneCtx.lineTo((zone.x - zone.u), zone.y + zone.v);
-								sceneCtx.stroke();
-							}
-
-							for (var i = 0; i < magnitudes.length; i++)
-							{
-								magnIndicationElements[i].innerText = magnitudes[i];
-							}
-							
+						if (goalReached(camera.position, goalPostion)) {
+							$scope.$apply(function(){
+								$scope.runToEnd = false;
+								$scope.missonComplete = true;
+							});
 						}
-						oldImage = newImage;
-				}
-			};
+					}
+				};
 
-			render();
+				
+				$scope.obstacleCnt = 200;
+
+				$scope.reset = function() {
+					$scope.runToEnd = false;
+					$scope.missonComplete = false;
+					scene = setupWorld(camera, worldWidth, worldDepth, goalPostion, $scope.obstacleCnt);
+				}
+
+				$scope.reset();
+
+				$scope.navigate = function() {
+					$scope.runToEnd = true;
+				}
+
+				render();
+			}]);
+
 		</script>
 	</body>
 </html>
