@@ -41,6 +41,7 @@
 				Obstacles: <input type="number" ng-model="obstacleCnt">
 			</p>
 			<div class="alert alert-success" ng-show="missonComplete">Mission complete</div>
+			<div class="alert alert-danger" ng-show="collisionCount > 0">Collisions: {{collisionCount}}</div>
 		</div>
 		
 		<div id="flowOutContainer"><canvas id="flowOut" width="800" height="600"></canvas></div>
@@ -57,9 +58,19 @@
 		<script src="js/autopilot.js"></script>
 
 		<script type="text/javascript">
-			function addObstacles(scene, worldWidth, worldDepth, count) {
-				var radius = 0.3;
-				var geometry = new THREE.CylinderGeometry(radius, radius, 4);
+			var botRadius = 0.3;
+			var obstacleRadius = 0.3;
+
+			function generateObstacles(worldWidth, worldDepth, count) {
+				var obstacles = [];
+				for (var i = 0; i < count; i++)	{
+					obstacles.push(new THREE.Vector3(Math.random() * worldWidth - worldWidth / 2, 0.5, Math.random() * worldDepth - worldDepth / 2));
+				}
+				return obstacles;
+			}
+
+			function addObstacles(scene, obstaclePositions) {
+				var geometry = new THREE.CylinderGeometry(obstacleRadius, obstacleRadius, 4);
 
 				var texture = THREE.ImageUtils.loadTexture( "img/lavatile.jpg" );
 				texture.repeat.set( 4, 2 );
@@ -67,15 +78,11 @@
 				texture.anisotropy = 16;
 				var material = new THREE.MeshLambertMaterial( { map: texture, color: 0xFFff00, ambient: 0x999999, shading: THREE.SmoothShading } );
 
-				for (var i = 0; i < count; i++)
+				for (var i = 0; i < obstaclePositions.length; i++)
 				{
 					var cylinder = new THREE.Mesh(geometry, material ); 
 
-					cylinder.position.y = 0.5;
-
-					cylinder.position.x = Math.random() * worldWidth - worldWidth / 2;
-					cylinder.position.z = Math.random() * worldDepth - worldDepth / 2;
-
+					cylinder.position.copy(obstaclePositions[i]);
 					scene.add( cylinder );
 				}
 			}
@@ -105,12 +112,12 @@
 				scene.add( sphere );
 			}
 
-			function setupWorld(camera, worldWidth, worldDepth, goalPostion, obstacleCnt){
+			function setupWorld(camera, worldWidth, worldDepth, goalPostion, obstaclePositions){
 				var scene = new THREE.Scene();
 
 				addLights(scene);
 				addFloor(scene, worldWidth, worldDepth);
-				addObstacles(scene, worldWidth, worldDepth, obstacleCnt)			
+				addObstacles(scene, obstaclePositions);		
 				addGoal(scene, goalPostion);
 
 				//== position camera ==
@@ -122,6 +129,15 @@
 
 			function goalReached(currentPostion, goalPostion) {
 				return currentPostion.distanceTo(goalPostion) < 2;
+			}
+
+			function collided(currentPostion, obstacles) {
+				for (var i = 0; i < obstacles.length; i++){
+					if (obstacles[i].distanceTo(currentPostion) <= botRadius + obstacleRadius)
+						return true;
+				}
+
+				return false;
 			}
 
 			var app = angular.module("oflowNav", []);
@@ -170,6 +186,12 @@
 								$scope.missonComplete = true;
 							});
 						}
+
+						if (collided(camera.position, $scope.obstacles)) {
+							$scope.$apply(function(){
+								$scope.collisionCount++;
+							});
+						}
 					}
 				};
 
@@ -179,7 +201,10 @@
 				$scope.reset = function() {
 					$scope.runToEnd = false;
 					$scope.missonComplete = false;
-					scene = setupWorld(camera, worldWidth, worldDepth, goalPostion, $scope.obstacleCnt);
+					$scope.collisionCount = 0;
+
+					$scope.obstacles = generateObstacles(worldWidth, worldDepth, $scope.obstacleCnt);
+					scene = setupWorld(camera, worldWidth, worldDepth, goalPostion, $scope.obstacles);
 				}
 
 				$scope.reset();
