@@ -16,17 +16,14 @@ function constrain(x, min, max)
 	return x;
 }
 
-function Autopilot(videoInputElement, debugInfoElement){
+function Autopilot(videoInputElement, debugInfoElement, width, height){
 
 	var targetPosition = new THREE.Vector3(0, 0, 0);
 	var fwdSpeed = 0.1;
 	var turnRate = 0.02;
 	
-	
-	var width = videoInputElement.clientWidth;
-	var height = videoInputElement.clientHeight;
 	var calculator = new oflow.FlowCalculator(6);
-	var imgCapturer = new CanvasImageCapturer(videoInputElement);
+	var imgCapturer = new CanvasImageCapturer(videoInputElement, width, height);
 
 	var debugSceneCtx = debugInfoElement.getContext('2d');
 

@@ -1,7 +1,4 @@
-function CanvasImageCapturer(canvasElement) {	
-	var height = canvasElement.height;
-	var width = canvasElement.width;
-
+function CanvasImageCapturer(canvasElement, width, height) {	
 	var proxyCanvas = document.createElement("canvas");
 	proxyCanvas.setAttribute('height', height);
 	proxyCanvas.setAttribute('width', width);

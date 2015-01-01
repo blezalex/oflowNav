@@ -50,7 +50,6 @@ function NavController(camera, controlElement, stepSize, turnRate, goalPosition,
 			cameraLookDirection.copy(nextStep[1]);
 		}
 
-		var currentLookDirection = new THREE.Vector3().addVectors(camera.position, cameraLookDirection);
-		camera.lookAt(currentLookDirection);
+		return new THREE.Vector3().addVectors(camera.position, cameraLookDirection);
 	}
 }
