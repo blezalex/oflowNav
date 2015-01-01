@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html ng-app="oflowNav">
 	<head>
 		<title>My first Three.js app</title>
@@ -8,271 +9,275 @@
 			#camInput {
 				width: 1600px;
 				height: 600px;
-				display: inline-block;
 			}
 
 			#flowOutContainer, #flowOut {
 				width: 800px;
 				height: 600px;
 				border: 1px solid black;
-			}
-
-			#camInput, .controlPanel {
 				display: inline-block;
-				vertical-align: top;
 			}
 
 		</style>
 
 		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap.min.css">
 	</head>
-	<body ng-controller="mainCtrl">
-		<div id="camInput"> </div>
-		<div id ="topView"></div>
-		<div class="controlPanel">
-			<h3>
-				Controls:
-			</h3>			
-			<p>
-				<button ng-click="navigate()" class="btn btn-primary" ng-disabled="runToEnd">Navigate</button>
-			</p>
+	<body>
+		<div class="container-fluid" ng-controller="mainCtrl">
+			<div class="row">
+				<div class="col">
+					<div id="camInput"></div>
+				</div>
+			</div>
+			
+			<div class="row">
+				<div class="col-lg-2">
+					<h3>
+						Controls:
+					</h3>			
+					<p>
+						<button ng-click="navigate()" class="btn btn-primary" ng-disabled="runToEnd">Navigate</button>
+					</p>
 
-			<p>
-				<button ng-click="reset()" class="btn btn-warning">Rebuild</button>
-			</p>
-			<p>
-				Obstacles: <input type="number" ng-model="obstacleCnt">
-			</p>
-			<div class="alert alert-success" ng-show="missonComplete">Mission complete</div>
-			<div class="alert alert-danger" ng-show="collisionCount > 0">Collisions: {{collisionCount}}</div>
+					<p>
+						<button ng-click="reset()" class="btn btn-warning">Rebuild</button>
+					</p>
+					<p>
+						Obstacles: <input type="number" ng-model="obstacleCnt">
+					</p>
+					<div class="alert alert-success" ng-show="missonComplete">Mission complete</div>
+					<div class="alert alert-danger" ng-show="collisionCount > 0">Collisions: {{collisionCount}}</div>
+				</div>
+				<div>
+					<div id="flowOutContainer"><canvas id="flowOut" width="800" height="600"></canvas></div>
+				</div>
+			</div>
+
+
+			<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.8/angular.min.js"></script>
+			<script src="js/ext/three.min.js"></script>
+			<script src="js/ext/OrbitControls.js"></script>
+
+			<script src="js/ext/oflow/colors.js"></script>
+			<script src="js/ext/oflow/oflow.js"></script>
+
+			<script src="js/navController.js"></script>
+			<script src="js/CanvasImageCapturer.js"></script>
+			<script src="js/autopilot.js"></script>
+
+			<script type="text/javascript">
+				var botRadius = 0.3;
+				var obstacleRadius = 0.3;
+				var obstacleHeight = 4;
+
+				function generateObstacles(worldWidth, worldDepth, count) {
+					var obstacles = [];
+					for (var i = 0; i < count; i++)	{
+						obstacles.push(new THREE.Vector3(Math.random() * worldWidth - worldWidth / 2, obstacleHeight /2, Math.random() * worldDepth - worldDepth / 2));
+					}
+					return obstacles;
+				}
+
+				function addObstacles(scene, obstaclePositions) {
+					var geometry = new THREE.CylinderGeometry(obstacleRadius, obstacleRadius, obstacleHeight);
+
+					var texture = THREE.ImageUtils.loadTexture( "img/lavatile.jpg" );
+					texture.repeat.set( 4, 2 );
+					texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+					texture.anisotropy = 16;
+					var material = new THREE.MeshLambertMaterial( { map: texture, color: 0xFFff00, ambient: 0x999999, shading: THREE.SmoothShading } );
+
+					for (var i = 0; i < obstaclePositions.length; i++)
+					{
+						var cylinder = new THREE.Mesh(geometry, material ); 
+
+						cylinder.position.copy(obstaclePositions[i]);
+						scene.add( cylinder );
+					}
+				}
+
+				function addFloor(scene, worldWidth, worldDepth) {
+					var planeG = new THREE.PlaneGeometry( worldWidth*2, worldDepth*2); 
+					var material = new THREE.MeshLambertMaterial( {color: 0xffff00, side: THREE.DoubleSide} ); 
+					var plane = new THREE.Mesh( planeG, material ); 
+					plane.rotation.x = Math.PI /2
+					scene.add( plane );
+				}
+
+				function addLights(scene) {
+					var light = new THREE.PointLight( 0xffffff, 1, 100 ); 
+					light.position.set( 4, 6, -4 ); 
+					scene.add( light );
+
+					var alight = new THREE.AmbientLight( 0x505050 ); // soft white light 
+					scene.add( alight );
+				}
+
+				function addGoal(scene, position) {
+					var geometry = new THREE.SphereGeometry( 0.4, 32, 32 ); 
+					var material = new THREE.MeshLambertMaterial( {color: 0x00ff00} ); 
+					var sphere = new THREE.Mesh( geometry, material ); 
+					sphere.position.copy(position);
+
+					scene.add( sphere );
+				}
+
+
+				function addBot(scene, position) {
+					
+					var sphere = new THREE.Mesh( new THREE.SphereGeometry( botRadius, 32, 32 ), new THREE.MeshLambertMaterial( {color: 0xffff00} ) ); 
+					var cone = new THREE.Mesh( new THREE.CylinderGeometry( 0, botRadius, 1 ), new THREE.MeshBasicMaterial( {color: 0xff0000} ) ); 
+
+					cone.position.z = botRadius;
+					cone.rotation.x = Math.PI /2;
+					
+					var bot = new THREE.Object3D();
+					bot.add(sphere);
+					bot.add(cone);
+
+					scene.add( bot );
+					return bot;
+				}
+
+				function setupWorld(camera, worldWidth, worldDepth, goalPostion, obstaclePositions){
+					var scene = new THREE.Scene();
+
+					addLights(scene);
+					addFloor(scene, worldWidth, worldDepth);
+					addObstacles(scene, obstaclePositions);		
+					addGoal(scene, goalPostion);
+
+					//== position camera ==
+					camera.position.x = -worldWidth / 2 / 2;
+					camera.position.z = -worldDepth / 2 / 2;
+					camera.position.y = 1;
+
+					return scene;
+				}
+
+				function goalReached(currentPostion, goalPostion) {
+					return currentPostion.distanceTo(goalPostion) < 1.5;
+				}
+
+				function collided(currentPostion, obstacles) {
+
+					var botPossitionOnSameHeight = currentPostion.clone();
+					botPossitionOnSameHeight.y = obstacles[0].y; // for colision detection purposes asume all obstacles are at the same height as the bot
+
+					for (var i = 0; i < obstacles.length; i++){
+						if (obstacles[i].distanceTo(botPossitionOnSameHeight) <= botRadius + obstacleRadius && !obstacles[i].hit)
+						{
+							obstacles[i].hit = true;
+							return true;
+						}
+					}
+
+					return false;
+				}
+
+				var app = angular.module("oflowNav", []);
+
+				app.controller('mainCtrl', ['$scope', function($scope){
+					var rendererParrentDomElement = document.getElementById('camInput');
+					var renderer = new THREE.WebGLRenderer( { preserveDrawingBuffer: true });
+					renderer.setSize( rendererParrentDomElement.clientWidth, rendererParrentDomElement.clientHeight );
+					rendererParrentDomElement.appendChild( renderer.domElement );
+
+					var viewWidth = rendererParrentDomElement.clientWidth /2; // two view ports side by side in singe canvas
+					var viewHeight = rendererParrentDomElement.clientHeight;
+
+					var camera = new THREE.PerspectiveCamera( 75, viewWidth/viewHeight, 0.1, 1000 );
+
+					var thirdPersonViewCamera = new THREE.PerspectiveCamera( 65, viewWidth/viewHeight, 0.1, 1000 );
+					thirdPersonViewCamera.position.y = 40;
+					thirdPersonViewCamera.lookAt(new THREE.Vector3(0, 0, 0));
+
+					var controls = new THREE.OrbitControls( thirdPersonViewCamera );
+					controls.damping = 0.2;
+					
+					// center of the world is in 0,0 
+					var worldWidth = 50;
+					var worldDepth = 50;
+
+					var goalPostion = new THREE.Vector3(worldWidth / 2, 1, worldDepth / 2); // goal is at the end of the world
+					var scene;
+					var bot;
+
+					var autopilot = new Autopilot(renderer.domElement, document.getElementById('flowOut'), viewWidth, viewHeight);
+					autopilot.setTarget(goalPostion);
+
+					var cameraLookDirection = new THREE.Vector3(0, 0, 1);
+					var nav = new NavController(camera, document.body, 0.1, 0.02, goalPostion, autopilot);
+
+					var render = function () {
+						requestAnimationFrame( render );
+
+						renderer.setViewport(0, 0, viewWidth, viewHeight);
+						renderer.setScissor( 0, 0, viewWidth, viewHeight );
+						renderer.enableScissorTest (true);
+						renderer.render(scene, camera);
+
+						renderer.setViewport(viewWidth, 0, viewWidth, viewHeight);
+						renderer.setScissor( viewWidth, 0, viewWidth, viewHeight );
+						renderer.enableScissorTest (true);
+						renderer.render(scene, thirdPersonViewCamera);
+
+
+						var lookDirection;
+						if (!$scope.runToEnd)
+							lookDirection = nav.processInput(cameraLookDirection);
+						else
+						{
+							var nextStep = autopilot.getNextStep(cameraLookDirection, camera.position);
+
+							camera.position.add(nextStep[0]);
+							cameraLookDirection.copy(nextStep[1]);
+							
+							lookDirection = new THREE.Vector3().addVectors(camera.position, cameraLookDirection);
+
+						}
+
+						if (goalReached(camera.position, goalPostion)) {
+							$scope.$apply(function(){
+								$scope.runToEnd = false;
+								$scope.missonComplete = true;
+							});
+						}
+
+						if (collided(camera.position, $scope.obstacles)) {
+							$scope.$apply(function(){
+								$scope.collisionCount++;
+							});
+						}
+
+						bot.position.copy(camera.position);
+						camera.lookAt(lookDirection);
+						bot.lookAt(lookDirection);
+					};
+
+					
+					$scope.obstacleCnt = 300;
+
+					$scope.reset = function() {
+						$scope.runToEnd = false;
+						$scope.missonComplete = false;
+						$scope.collisionCount = 0;
+
+						$scope.obstacles = generateObstacles(worldWidth, worldDepth, $scope.obstacleCnt);
+						scene = setupWorld(camera, worldWidth, worldDepth, goalPostion, $scope.obstacles);
+						bot = addBot(scene, camera.position);
+					}
+
+					$scope.reset();
+
+					$scope.navigate = function() {
+						$scope.runToEnd = true;
+					}
+
+					render();
+				}]);
+
+			</script>
 		</div>
-		
-		<div id="flowOutContainer"><canvas id="flowOut" width="800" height="600"></canvas></div>
-		<div><span id="magnLeft"></span> <span id="magnRight"></span></div>
-
-		<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.8/angular.min.js"></script>
-		<script src="js/ext/three.min.js"></script>
-		<script src="js/ext/OrbitControls.js"></script>
-
-		<script src="js/ext/oflow/colors.js"></script>
-		<script src="js/ext/oflow/oflow.js"></script>
-
-		<script src="js/navController.js"></script>
-		<script src="js/CanvasImageCapturer.js"></script>
-		<script src="js/autopilot.js"></script>
-
-		<script type="text/javascript">
-			var botRadius = 0.3;
-			var obstacleRadius = 0.3;
-			var obstacleHeight = 4;
-
-			function generateObstacles(worldWidth, worldDepth, count) {
-				var obstacles = [];
-				for (var i = 0; i < count; i++)	{
-					obstacles.push(new THREE.Vector3(Math.random() * worldWidth - worldWidth / 2, obstacleHeight /2, Math.random() * worldDepth - worldDepth / 2));
-				}
-				return obstacles;
-			}
-
-			function addObstacles(scene, obstaclePositions) {
-				var geometry = new THREE.CylinderGeometry(obstacleRadius, obstacleRadius, obstacleHeight);
-
-				var texture = THREE.ImageUtils.loadTexture( "img/lavatile.jpg" );
-				texture.repeat.set( 4, 2 );
-				texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-				texture.anisotropy = 16;
-				var material = new THREE.MeshLambertMaterial( { map: texture, color: 0xFFff00, ambient: 0x999999, shading: THREE.SmoothShading } );
-
-				for (var i = 0; i < obstaclePositions.length; i++)
-				{
-					var cylinder = new THREE.Mesh(geometry, material ); 
-
-					cylinder.position.copy(obstaclePositions[i]);
-					scene.add( cylinder );
-				}
-			}
-
-			function addFloor(scene, worldWidth, worldDepth) {
-				var planeG = new THREE.PlaneGeometry( worldWidth*2, worldDepth*2); 
-				var material = new THREE.MeshLambertMaterial( {color: 0xffff00, side: THREE.DoubleSide} ); 
-				var plane = new THREE.Mesh( planeG, material ); 
-				plane.rotation.x = Math.PI /2
-				scene.add( plane );
-			}
-
-			function addLights(scene) {
-				var light = new THREE.PointLight( 0xffffff, 1, 100 ); 
-				light.position.set( 4, 6, -4 ); 
-				scene.add( light );
-
-				var alight = new THREE.AmbientLight( 0x505050 ); // soft white light 
-				scene.add( alight );
-			}
-
-			function addGoal(scene, position) {
-				var geometry = new THREE.SphereGeometry( 0.4, 32, 32 ); 
-				var material = new THREE.MeshLambertMaterial( {color: 0x00ff00} ); 
-				var sphere = new THREE.Mesh( geometry, material ); 
-				sphere.position.copy(position);
-
-				scene.add( sphere );
-			}
-
-
-			function addBot(scene, position) {
-				
-				var sphere = new THREE.Mesh( new THREE.SphereGeometry( botRadius, 32, 32 ), new THREE.MeshLambertMaterial( {color: 0xffff00} ) ); 
-				var cone = new THREE.Mesh( new THREE.CylinderGeometry( 0, botRadius, 1 ), new THREE.MeshBasicMaterial( {color: 0xff0000} ) ); 
-
-				cone.position.z = botRadius;
-				cone.rotation.x = Math.PI /2;
-				
-				var bot = new THREE.Object3D();
-				bot.add(sphere);
-				bot.add(cone);
-
-				scene.add( bot );
-				return bot;
-			}
-
-			function setupWorld(camera, worldWidth, worldDepth, goalPostion, obstaclePositions){
-				var scene = new THREE.Scene();
-
-				addLights(scene);
-				addFloor(scene, worldWidth, worldDepth);
-				addObstacles(scene, obstaclePositions);		
-				addGoal(scene, goalPostion);
-
-				//== position camera ==
-				camera.position.x = -worldWidth / 2 / 2;
-				camera.position.z = -worldDepth / 2 / 2;
-				camera.position.y = 1;
-
-				return scene;
-			}
-
-			function goalReached(currentPostion, goalPostion) {
-				return currentPostion.distanceTo(goalPostion) < 1.5;
-			}
-
-			function collided(currentPostion, obstacles) {
-
-				var botPossitionOnSameHeight = currentPostion.clone();
-				botPossitionOnSameHeight.y = obstacles[0].y; // for colision detection purposes asume all obstacles are at the same height as the bot
-
-				for (var i = 0; i < obstacles.length; i++){
-					if (obstacles[i].distanceTo(botPossitionOnSameHeight) <= botRadius + obstacleRadius && !obstacles[i].hit)
-					{
-						obstacles[i].hit = true;
-						return true;
-					}
-				}
-
-				return false;
-			}
-
-			var app = angular.module("oflowNav", []);
-
-			app.controller('mainCtrl', ['$scope', function($scope){
-				var rendererParrentDomElement = document.getElementById('camInput');
-				var renderer = new THREE.WebGLRenderer( { preserveDrawingBuffer: true });
-				renderer.setSize( rendererParrentDomElement.clientWidth, rendererParrentDomElement.clientHeight );
-				rendererParrentDomElement.appendChild( renderer.domElement );
-
-				var viewWidth = rendererParrentDomElement.clientWidth /2; // two view ports side by side in singe canvas
-				var viewHeight = rendererParrentDomElement.clientHeight;
-
-				var camera = new THREE.PerspectiveCamera( 75, viewWidth/viewHeight, 0.1, 1000 );
-
-				var thirdPersonViewCamera = new THREE.PerspectiveCamera( 65, viewWidth/viewHeight, 0.1, 1000 );
-				thirdPersonViewCamera.position.y = 40;
-				thirdPersonViewCamera.lookAt(new THREE.Vector3(0, 0, 0));
-
-				var controls = new THREE.OrbitControls( thirdPersonViewCamera );
-				controls.damping = 0.2;
-				
-				// center of the world is in 0,0 
-				var worldWidth = 50;
-				var worldDepth = 50;
-
-				var goalPostion = new THREE.Vector3(worldWidth / 2, 1, worldDepth / 2); // goal is at the end of the world
-				var scene;
-				var bot;
-
-				var autopilot = new Autopilot(renderer.domElement, document.getElementById('flowOut'), viewWidth, viewHeight);
-				autopilot.setTarget(goalPostion);
-
-				var cameraLookDirection = new THREE.Vector3(0, 0, 1);
-				var nav = new NavController(camera, document.body, 0.1, 0.02, goalPostion, autopilot);
-
-				var render = function () {
-					requestAnimationFrame( render );
-
-					renderer.setViewport(0, 0, viewWidth, viewHeight);
-					renderer.setScissor( 0, 0, viewWidth, viewHeight );
-					renderer.enableScissorTest (true);
-					renderer.render(scene, camera);
-
-					renderer.setViewport(viewWidth, 0, viewWidth, viewHeight);
-					renderer.setScissor( viewWidth, 0, viewWidth, viewHeight );
-					renderer.enableScissorTest (true);
-					renderer.render(scene, thirdPersonViewCamera);
-
-
-					var lookDirection;
-					if (!$scope.runToEnd)
-						lookDirection = nav.processInput(cameraLookDirection);
-					else
-					{
-						var nextStep = autopilot.getNextStep(cameraLookDirection, camera.position);
-
-						camera.position.add(nextStep[0]);
-						cameraLookDirection.copy(nextStep[1]);
-						
-						lookDirection = new THREE.Vector3().addVectors(camera.position, cameraLookDirection);
-
-					}
-
-					if (goalReached(camera.position, goalPostion)) {
-						$scope.$apply(function(){
-							$scope.runToEnd = false;
-							$scope.missonComplete = true;
-						});
-					}
-
-					if (collided(camera.position, $scope.obstacles)) {
-						$scope.$apply(function(){
-							$scope.collisionCount++;
-						});
-					}
-
-					bot.position.copy(camera.position);
-					camera.lookAt(lookDirection);
-					bot.lookAt(lookDirection);
-				};
-
-				
-				$scope.obstacleCnt = 300;
-
-				$scope.reset = function() {
-					$scope.runToEnd = false;
-					$scope.missonComplete = false;
-					$scope.collisionCount = 0;
-
-					$scope.obstacles = generateObstacles(worldWidth, worldDepth, $scope.obstacleCnt);
-					scene = setupWorld(camera, worldWidth, worldDepth, goalPostion, $scope.obstacles);
-					bot = addBot(scene, camera.position);
-				}
-
-				$scope.reset();
-
-				$scope.navigate = function() {
-					$scope.runToEnd = true;
-				}
-
-				render();
-			}]);
-
-		</script>
 	</body>
 </html>
