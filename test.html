@@ -20,20 +20,27 @@
 	 	var width  = 800;
 	 	var height = 600;
 
-	 	var calculator = new oflow.FlowCalculator(8);
+	 	
 
-		function renderFlowVectors(zones) {
-			debugSceneCtx.clearRect(0, 0, width, height);
+		function renderFlowVectors(zones, ctx) {
+			ctx.clearRect(0, 0, width, height);
 			
 			for(var i = 0; i < zones.length; ++i) {
 				var zone = zones[i];
 
-				debugSceneCtx.strokeStyle = getDirectionalColor(zone.u, zone.v);
-				debugSceneCtx.beginPath();
-				debugSceneCtx.moveTo(zone.x,zone.y);
-				debugSceneCtx.lineTo((zone.x - zone.u), zone.y + zone.v);
-				debugSceneCtx.stroke();
+				ctx.strokeStyle = getDirectionalColor(zone.u, zone.v);
+				ctx.beginPath();
+				ctx.moveTo(zone.x,zone.y);
+				ctx.lineTo((zone.x - zone.u), zone.y + zone.v);
+				ctx.stroke();
 			}
+		}
+
+		function onGetImages2(currentImage, prevImage) {
+			var calculator = new oflow.FlowCalculator(8);
+
+			var zones = calculator.calculate(prevImage.data, currentImage.data, width, height).zones;
+			renderFlowVectors(zones, ctx);
 		}
 
 		function onGetImages(currentImage, prevImage) {
@@ -98,6 +105,7 @@
 		}
 
 		function renderFlow(prev_xy, curr_xy, point_status, ctx) {
+			ctx.clearRect(0, 0, width, height);
 			for (var i = 0; i < point_status.length; i++) {
 				if (point_status[i] === 1) { // point is detected
 
