@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title></title>
+</head>
+<body>
+	<script src="js/ext/oflow/colors.js"></script>
+	<script src="js/ext/oflow/oflow.js"></script>
+	<script src="js/ext/jsfeat-min.js"></script>
+
+	<canvas id="flowOut" width="800" height="600"></canvas>
+
+	<canvas id="canvas" width="800" height="600"> </canvas>
+
+	<script type="text/javascript">
+
+	 	var ctx = document.getElementById('canvas').getContext('2d');
+	 	var debugSceneCtx = document.getElementById('flowOut').getContext('2d');
+
+	 	var width  = 800;
+	 	var height = 600;
+
+	 	var calculator = new oflow.FlowCalculator(8);
+
+		function renderFlowVectors(zones) {
+			debugSceneCtx.clearRect(0, 0, width, height);
+			
+			for(var i = 0; i < zones.length; ++i) {
+				var zone = zones[i];
+
+				debugSceneCtx.strokeStyle = getDirectionalColor(zone.u, zone.v);
+				debugSceneCtx.beginPath();
+				debugSceneCtx.moveTo(zone.x,zone.y);
+				debugSceneCtx.lineTo((zone.x - zone.u), zone.y + zone.v);
+				debugSceneCtx.stroke();
+			}
+		}
+
+		function onGetImages(currentImage, prevImage) {
+			corners = [];
+            
+            var i = width*height; // consider fixed number of tracking points
+            while(--i >= 0) {
+            	corners[i] = new jsfeat.keypoint_t(0,0,0,0);
+            }
+
+			var currentImg_u8 = new jsfeat.matrix_t(width, height, jsfeat.U8_t | jsfeat.C1_t);
+			var prevImg_u8 = new jsfeat.matrix_t(width, height, jsfeat.U8_t | jsfeat.C1_t);
+            
+            jsfeat.imgproc.grayscale(currentImage.data, width, height, currentImg_u8);
+            jsfeat.imgproc.grayscale(prevImage.data, width, height, prevImg_u8);
+
+            var blurred_prevImg_u8 = new jsfeat.matrix_t(width, height, jsfeat.U8_t | jsfeat.C1_t);
+            jsfeat.imgproc.box_blur_gray(prevImg_u8, blurred_prevImg_u8, 2, 0);
+
+            jsfeat.yape06.laplacian_threshold = 60;
+            jsfeat.yape06.min_eigen_value_threshold = 25;
+
+            var point_count = jsfeat.yape06.detect(blurred_prevImg_u8, corners);
+
+            var data_u32 = new Uint32Array(prevImage.data.buffer);
+            render_corners(corners, point_count, data_u32, width);
+                 
+            var ctx = document.getElementById('canvas').getContext('2d');   
+          //  ctx.putImageData(prevImage, 0, 0);
+
+
+            var curr_img_pyr, prev_img_pyr, point_count, point_status, prev_xy, curr_xy;
+
+            curr_img_pyr = new jsfeat.pyramid_t(3);
+            prev_img_pyr = new jsfeat.pyramid_t(3);
+            curr_img_pyr.allocate(width, height, jsfeat.U8_t|jsfeat.C1_t);
+            prev_img_pyr.allocate(width, height, jsfeat.U8_t|jsfeat.C1_t);
+
+            curr_img_pyr.data[0] = currentImg_u8;
+            curr_img_pyr.build(curr_img_pyr.data[0], true);
+
+            prev_img_pyr.data[0] = prevImg_u8;
+            prev_img_pyr.build(prev_img_pyr.data[0], true);
+
+            point_status = new Uint8Array(point_count);
+        	prev_xy = new Float32Array(point_count*2);
+            curr_xy = new Float32Array(point_count*2);
+
+            for (var i = 0; i < point_count; i++) {
+            	prev_xy[i*2] = corners[i].x;
+            	prev_xy[i*2 + 1] = corners[i].y;
+            }
+
+            var win_size = 20,
+            	max_iterations = 30,
+            	epsilon = 0.01,
+                min_eigen = 0.001;
+
+            jsfeat.optical_flow_lk.track(prev_img_pyr, curr_img_pyr, prev_xy, curr_xy, point_count, win_size, max_iterations, point_status, epsilon, min_eigen);
+
+            renderFlow(prev_xy, curr_xy, point_status, ctx);
+		}
+
+		function renderFlow(prev_xy, curr_xy, point_status, ctx) {
+			for (var i = 0; i < point_status.length; i++) {
+				if (point_status[i] === 1) { // point is detected
+
+					var x = prev_xy[i*2];
+					var y = prev_xy[i*2 + 1];
+
+					var u = curr_xy[i*2] - prev_xy[i*2];
+					var v = curr_xy[i*2 + 1] - prev_xy[i*2 + 1];
+
+					ctx.strokeStyle = getDirectionalColor(u, v);
+					ctx.beginPath();
+					ctx.moveTo(x, y);
+					ctx.lineTo((x + u), y + v);
+					ctx.stroke();
+				}
+			}
+		}
+
+        function render_corners(corners, count, img, step) {
+            var pix = (0xff << 24) | (0x00 << 16) | (0xff << 8) | 0x00;
+            for(var i=0; i < count; ++i)
+            {
+                var x = corners[i].x;
+                var y = corners[i].y;
+                var off = (x + y * step);
+                img[off] = pix;
+                img[off-1] = pix;
+                img[off+1] = pix;
+                img[off-step] = pix;
+                img[off+step] = pix;
+            }
+        }
+
+
+
+	 	var imgData1;
+	 	var imgData2;
+
+
+		var img = new Image();
+		img.src = 'img/frame0.jpg';
+		img.onload = function(){
+			ctx.drawImage(img,0,0);
+		    imgData1 = ctx.getImageData(0,0, width, height);
+
+		    img.onload = null;
+
+			img.onload = function(){
+				ctx.drawImage(img,0,0);
+			    imgData2 = ctx.getImageData(0,0, width, height);
+
+			    onGetImages(imgData2, imgData1);
+			}
+			img.src = 'img/frame1.jpg';
+		}
+
+
+
+	</script>
+</body>
+</html>

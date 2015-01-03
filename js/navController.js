@@ -14,6 +14,8 @@ function NavController(camera, controlElement, stepSize, turnRate, goalPosition,
 	}
 
 	this.processInput = function(cameraLookDirection){
+		var autoPilotNextStep = autopilot.getNextStep(cameraLookDirection, camera.position);
+
 		if (pressed['W'.charCodeAt(0)])
 		{
 			var moveStep = cameraLookDirection.clone().multiplyScalar(stepSize);
@@ -33,21 +35,10 @@ function NavController(camera, controlElement, stepSize, turnRate, goalPosition,
 			cameraLookDirection.applyAxisAngle(new THREE.Vector3( 0, 1, 0 ), turnRate);
 		}
 
-		if (pressed['T'.charCodeAt(0)])
-		{
-			var vectorLookingAtGoal = new THREE.Vector3(goalPosition.x - camera.position.x, camera.position.y, goalPosition.z - camera.position.z);
-
-			var navTurnRate = Math.atan2(cameraLookDirection.z, cameraLookDirection.x) - Math.atan2(vectorLookingAtGoal.z, vectorLookingAtGoal.x);
-			
-			cameraLookDirection.applyAxisAngle(new THREE.Vector3( 0, 1, 0 ), turnRate * (navTurnRate));
-		}
-
 		if (pressed['Q'.charCodeAt(0)])
 		{
-			var nextStep = autopilot.getNextStep(cameraLookDirection, camera.position);
-
-			camera.position.add(nextStep[0]);
-			cameraLookDirection.copy(nextStep[1]);
+			camera.position.add(autoPilotNextStep[0]);
+			cameraLookDirection.copy(autoPilotNextStep[1]);
 		}
 
 		return new THREE.Vector3().addVectors(camera.position, cameraLookDirection);

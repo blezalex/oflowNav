@@ -22,7 +22,7 @@ function Autopilot(videoInputElement, debugInfoElement, width, height){
 	var fwdSpeed = 0.1;
 	var turnRate = 0.02;
 	
-	var calculator = new oflow.FlowCalculator(6);
+	var calculator = new oflow.FlowCalculator(20);
 	var imgCapturer = new CanvasImageCapturer(videoInputElement, width, height);
 
 	var debugSceneCtx = debugInfoElement.getContext('2d');
@@ -60,16 +60,17 @@ function Autopilot(videoInputElement, debugInfoElement, width, height){
 			return [positionShift, newLookDirection];
 		}
 
-		var magnitudes = [0,0];
-		
 		var zones = calculator.calculate(oldImage.data, newImage.data, width, height).zones;
-		renderFlowVectors(zones);
-			
+
+		var magnitudes = [0,0];
 		for(var i = 0; i < zones.length; ++i) {
 			var zone = zones[i];
 			magnitudes[zone.x > midPoint ? 1 : 0] += Math.abs(zone.u) + Math.abs(zone.v);
-		}		
-		
+		}	
+
+		if (magnitudes[0] > 0 || magnitudes[1] > 0) // render vectos only when there is motion, othewise keep old image
+			renderFlowVectors(zones);
+			
 		oldImage = newImage;
 
 		var magnitureBasedTurnRate = magnitudes[0] - magnitudes[1];
