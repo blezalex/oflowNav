@@ -22,7 +22,7 @@ function Autopilot(videoInputElement, debugInfoElement, width, height){
 	var fwdSpeed = 0.1;
 	var turnRate = 0.02;
 	
-	var calculator = new oflow.FlowCalculator(20);
+	var calculator = new oflow.FlowCalculator(6);
 	var imgCapturer = new CanvasImageCapturer(videoInputElement, width, height);
 
 	var debugSceneCtx = debugInfoElement.getContext('2d');
@@ -73,16 +73,25 @@ function Autopilot(videoInputElement, debugInfoElement, width, height){
 			
 		oldImage = newImage;
 
-		var magnitureBasedTurnRate = magnitudes[0] - magnitudes[1];
+		var magnitureBasedTurnRate = 0;
 
-		magnitureBasedTurnRate = constrain(magnitureBasedTurnRate, -2000, 2000);
+		var magnWeight = (magnitudes[0] + magnitudes[1]) / 500;
+		if (magnWeight > 10)
+			magnWeight = 10;
+
+		if (magnitudes[0] > 0 || magnitudes[1] > 0)
+		{
+			magnitureBasedTurnRate = (magnitudes[0] - magnitudes[1]) / (magnitudes[0] + magnitudes[1]);
+		}
+
+	//	magnitureBasedTurnRate = constrain(magnitureBasedTurnRate, -2000, 2000);
 
 		var vectorLookingAtGoal = new THREE.Vector3(targetPosition.x - position.x, position.y, targetPosition.z - position.z);
 		var navTurnRate = Math.atan2(cameraLookDirection.z, cameraLookDirection.x) - Math.atan2(vectorLookingAtGoal.z, vectorLookingAtGoal.x);
 
 		navTurnRate = constrain(navTurnRate, -Math.PI / 2, Math.PI / 2);
 
-		var newLookDirection = newLookDirection.applyAxisAngle(new THREE.Vector3( 0, 1, 0 ), turnRate * ((-magnitureBasedTurnRate/500) + navTurnRate * 2));
+		var newLookDirection = newLookDirection.applyAxisAngle(new THREE.Vector3( 0, 1, 0 ), turnRate * ((-magnitureBasedTurnRate * magnWeight) + navTurnRate * 2));
 
 		return [positionShift, newLookDirection];
 	}
